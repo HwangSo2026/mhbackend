@@ -1,5 +1,8 @@
 services:
   redis:
-    image: 'redis:latest'
+    #    image: 'redis:latest' # latest : 가장 최신 버전의 Redis를 가져오라는 태그(tag) 요즘 안씀
+    image: redis:7-alpine # alpine : Alpine Linux 기반 (초경량) 이미지" 라는 베이스 OS 종류
+    container_name: mh-redis # 컨테이너 이름
     ports:
-      - '6379'
+      - "6380:6379"
+
