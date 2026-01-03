@@ -1,8 +1,29 @@
 services:
   redis:
-    #    image: 'redis:latest' # latest : 가장 최신 버전의 Redis를 가져오라는 태그(tag) 요즘 안씀
-    image: redis:7-alpine # alpine : Alpine Linux 기반 (초경량) 이미지" 라는 베이스 OS 종류
-    container_name: mh-redis # 컨테이너 이름
+    image: redis:7-alpine
+    container_name: mh-redis
+    restart: unless-stopped
     ports:
       - "6380:6379"
+    networks: [mh-net]
+    profiles: ["dev", "prod"]
 
+  backend:
+    build: .
+    container_name: mh-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_SESSION_STORE_TYPE: redis
+      ADMIN_NAME: ${ADMIN_NAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    depends_on:
+      - redis
+    networks: [mh-net]
+    profiles: ["prod"]   # ✅ 서버/통합 실행용
+
+networks:
+  mh-net:
