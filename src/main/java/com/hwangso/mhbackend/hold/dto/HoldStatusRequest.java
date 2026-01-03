@@ -11,9 +11,9 @@ public record HoldStatusRequest(
         @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "date 형식은 YYYY-MM-DD 이어야 합니다.")
         String date,
 
-        @Schema(example = "part3", description = "슬롯 (part1~part7)")
+        @Schema(example = "part3", description = "슬롯 (part1~part8)")
         @NotBlank(message = "slot은 필수입니다.")
-        @Pattern(regexp = "^part[1-7]$", message = "slot은 part1~part7 중 하나여야 합니다.")
+        @Pattern(regexp = "^part[1-8]$", message = "slot은 part1~part8 중 하나여야 합니다.")
         String slot,
 
         @Schema(example = "4", description = "회의실 번호 (1~7)")

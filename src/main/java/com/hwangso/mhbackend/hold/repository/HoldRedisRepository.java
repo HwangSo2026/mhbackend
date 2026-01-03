@@ -14,13 +14,16 @@ public class HoldRedisRepository {
 
     private final StringRedisTemplate redis;
     private final RedisScript<Long> holdRefreshScript;
+    private final RedisScript<Long> holdReleaseScript;
 
     public HoldRedisRepository(
             StringRedisTemplate redis,
-            @Qualifier("holdRefreshScript") RedisScript<Long> holdRefreshScript
+            @Qualifier("holdRefreshScript") RedisScript<Long> holdRefreshScript,
+            @Qualifier("holdReleaseScript") RedisScript<Long> holdReleaseScript
     ) {
         this.redis = redis;
         this.holdRefreshScript = holdRefreshScript;
+        this.holdReleaseScript = holdReleaseScript;
     }
 
     /** SET holdKey token NX EX ttlSeconds */
@@ -54,6 +57,21 @@ public class HoldRedisRepository {
                 List.of(holdKey),
                 token,
                 String.valueOf(ttlSeconds)
+        );
+        return res == null ? 0 : res;
+    }
+
+    /**
+     * Lua release 결과:
+     *  1: 성공(삭제)
+     *  0: 토큰 불일치
+     * -1: 키 없음(만료)
+     */
+    public long releaseHold(String holdKey, String token) {
+        Long res = redis.execute(
+                holdReleaseScript,
+                List.of(holdKey),
+                token
         );
         return res == null ? 0 : res;
     }

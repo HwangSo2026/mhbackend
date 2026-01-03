@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
-public record HoldRefreshRequest(
+public record HoldReleaseRequest(
 
         @Schema(example = "2026-01-02", description = "예약 날짜 (YYYY-MM-DD)")
         @NotBlank(message = "date는 필수입니다.")
@@ -24,4 +24,5 @@ public record HoldRefreshRequest(
         @NotBlank(message = "holdToken은 필수입니다.")
         String holdToken
 
-) {}
+) {
+}

@@ -37,4 +37,17 @@ public class HoldController {
         return ResponseEntity.ok().build();
     }
 
+    /** 선점 중 전체 조회 */
+    @GetMapping("/rooms-status")
+    public ResponseEntity<SlotRoomsStatusResponse> roomsStatus(@Valid @ModelAttribute SlotRoomsStatusRequest req) {
+        return ResponseEntity.ok(service.roomsStatus(req));
+    }
+
+    /** 선점 취소 (TTL 만료전) */
+    @DeleteMapping("/release")
+    public ResponseEntity<Void> release(@Valid @RequestBody HoldReleaseRequest req) {
+        service.release(req);
+        return ResponseEntity.ok().build();
+    }
+
 }

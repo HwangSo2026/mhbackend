@@ -15,11 +15,11 @@ public record HoldAcquireRequest(
         String date,
 
 
-        @Schema(example = "part3", description = "슬롯 (part1~part7)")
+        @Schema(example = "part3", description = "슬롯 (part1~part8)")
         @NotBlank(message = "slot은 필수입니다.")
         @Pattern(
-                regexp = "^part[1-7]$",
-                message = "slot은 part1~part7 중 하나여야 합니다."
+                regexp = "^part[1-8]$",
+                message = "slot은 part1~part8 중 하나여야 합니다."
         )
         String slot,
 
