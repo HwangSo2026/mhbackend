@@ -38,6 +38,7 @@ class RedisIntegrationTest {
     @Autowired
     StringRedisTemplate redis; // StringRedisTemplate 사용
 
+
     @BeforeEach
     void clear() {
         var conn = redis.getConnectionFactory().getConnection();
