@@ -4,8 +4,10 @@ import com.hwangso.mhbackend.common.error.ApiException;
 import com.hwangso.mhbackend.common.error.ErrorCode;
 import com.hwangso.mhbackend.hold.dto.*;
 import com.hwangso.mhbackend.hold.repository.HoldRedisRepository;
+import com.hwangso.mhbackend.reservation.repository.ReservationRedisRepository;
 import com.hwangso.mhbackend.support.RedisKeys;
 import org.springframework.stereotype.Service;
+
 
 import java.util.UUID;
 
@@ -16,20 +18,46 @@ public class HoldService {
     private static final long HOLD_TTL_SECONDS = 300;
 
     private final HoldRedisRepository repo;
+    private final ReservationRedisRepository reservationRepo;
 
-    public HoldService(HoldRedisRepository repo) {
+    public HoldService(
+            HoldRedisRepository repo,
+            ReservationRedisRepository reservationRepo
+    ) {
         this.repo = repo;
+        this.reservationRepo = reservationRepo;
     }
 
-    public HoldAcquireResponse acquire(HoldAcquireRequest req) {
-        String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
-        String token = UUID.randomUUID().toString();
+//    public HoldAcquireResponse acquire(HoldAcquireRequest req) {
+//        String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
+//        String token = UUID.randomUUID().toString();
+//
+//        boolean ok = repo.acquireHold(holdKey, token, HOLD_TTL_SECONDS);
+//        if (!ok) throw new ApiException(ErrorCode.HOLD_CONFLICT); // 409
+//
+//        return new HoldAcquireResponse(token, HOLD_TTL_SECONDS);
+//    }
+public HoldAcquireResponse acquire(HoldAcquireRequest req) {
 
-        boolean ok = repo.acquireHold(holdKey, token, HOLD_TTL_SECONDS);
-        if (!ok) throw new ApiException(ErrorCode.HOLD_CONFLICT); // 409
+    // 1. 이미 예약 확정된 방인지 먼저 확인
+    String rsvKey = RedisKeys.rsvKey(req.date(), req.slot());
+    boolean alreadyReserved =
+            reservationRepo.getReservation(rsvKey, req.room()).isPresent();
 
-        return new HoldAcquireResponse(token, HOLD_TTL_SECONDS);
+    if (alreadyReserved) {
+        throw new ApiException(ErrorCode.RESERVATION_CONFLICT);
     }
+
+    // 2. 그 다음에 hold 선점
+    String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
+    String token = UUID.randomUUID().toString();
+
+    boolean ok = repo.acquireHold(holdKey, token, HOLD_TTL_SECONDS);
+    if (!ok) throw new ApiException(ErrorCode.HOLD_CONFLICT);
+
+    return new HoldAcquireResponse(token, HOLD_TTL_SECONDS);
+}
+
 
     public HoldStatusResponse status(HoldStatusRequest req) {
         String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
@@ -57,25 +85,63 @@ public class HoldService {
     }
 
     public SlotRoomsStatusResponse roomsStatus(SlotRoomsStatusRequest req) {
+
+        // 슬롯 하나에 대해 회의실 1~7번 상태를 담을 리스트
         var rooms = new java.util.ArrayList<RoomHoldStatus>(7);
 
+        // [추가됨]
+        // 예약 확정 정보는 "slot 단위 Hash"에 저장되어 있으므로
+        // 미리 rsvKey를 한 번만 만들어 둔다
+        // (기존 코드는 holdKey만 사용했음)
+        String rsvKey = RedisKeys.rsvKey(req.date(), req.slot());
+
+        // 회의실 1번 ~ 7번 순회
         for (int r = 1; r <= 7; r++) {
             String room = String.valueOf(r);
+
+            // 선점(hold) 상태는 room 단위 Key
             String holdKey = RedisKeys.holdKey(req.date(), req.slot(), room);
 
-            boolean held = repo.existsHold(holdKey);
-            if (!held) {
+            // 기존 코드:
+            // boolean held = repo.existsHold(holdKey);
+            //
+            // -> 문제:
+            // 이미 "예약 확정"된 방은 holdKey가 없기 때문에
+            // 예약 가능으로 잘못 판단됨
+
+            // [기존과 동일]
+            // 현재 다른 사용자가 선점 중인지 확인
+            boolean holdExists = repo.existsHold(holdKey);
+
+            // [추가됨 - 핵심 변경]
+            // 이미 예약이 "확정"되어 Redis Hash에 들어있는지 확인
+            // → CRUD 추가 후 반드시 필요해진 검사
+            boolean reservationExists =
+                    reservationRepo.getReservation(rsvKey, room).isPresent();
+
+            // [변경된 판단 기준]
+            // 예전: holdExists 하나만 봤음
+            // 지금: "선점 중 OR 이미 예약됨" 이면 사용 불가
+            boolean blocked = holdExists || reservationExists;
+
+            // 예약도 안 됐고, 선점도 안 된 경우
+            if (!blocked) {
+                // false = 사용 가능
+                // ttl = 0 (의미 없음)
                 rooms.add(new RoomHoldStatus(room, false, 0));
                 continue;
             }
-            long ttl = repo.ttlSeconds(holdKey);
-            // 기존 status()와 동일 규칙
-            if (ttl <= 0) {
-                rooms.add(new RoomHoldStatus(room, false, 0));
-            } else {
-                rooms.add(new RoomHoldStatus(room, true, ttl));
-            }
+
+            // 선점 중이면 TTL 의미 있음
+            // 예약 확정 상태면 TTL 의미 없음 → 0
+            long ttl = holdExists ? repo.ttlSeconds(holdKey) : 0;
+
+            // true = 사용 불가(예약중)
+            // ttl은 음수 방어 차원에서 0 이상으로 보정
+            rooms.add(new RoomHoldStatus(room, true, Math.max(ttl, 0)));
         }
+
+        // 슬롯 전체 회의실 상태 반환
         return new SlotRoomsStatusResponse(req.date(), req.slot(), rooms);
     }
 

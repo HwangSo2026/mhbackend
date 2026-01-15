@@ -10,4 +10,6 @@ public class MhbackendApplication {
 		SpringApplication.run(MhbackendApplication.class, args);
 	}
 
+
 }
+
