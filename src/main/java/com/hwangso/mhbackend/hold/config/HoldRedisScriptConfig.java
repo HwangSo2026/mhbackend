@@ -1,4 +1,4 @@
-package com.hwangso.mhbackend.config;
+package com.hwangso.mhbackend.hold.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -6,7 +6,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
 
 @Configuration
-public class RedisConfig {
+public class HoldRedisScriptConfig {
 
     // 선점 연장
     @Bean(name = "holdRefreshScript")
