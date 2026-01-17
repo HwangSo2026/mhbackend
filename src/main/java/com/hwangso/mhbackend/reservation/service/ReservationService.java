@@ -7,6 +7,8 @@ import com.hwangso.mhbackend.support.RedisKeys;
 import com.hwangso.mhbackend.support.RedisTtlPolicy;
 import com.hwangso.mhbackend.common.error.ApiException;          // [수정]
 import com.hwangso.mhbackend.common.error.ErrorCode;            // [수정]
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -15,11 +17,63 @@ import org.springframework.stereotype.Service;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
 public class ReservationService {
+
+    /**
+     * 예약 수정(Update) + 예약 삭제(Delete) 공통 흐름
+     * - 1) 현재 값 읽기, 예약 존재 여부 확인
+     * - 2) bcrypt 비번 검증
+     * - 3) 통과 시 Lua Script로 HSET Redis 변경
+     */
+    public void update(String date, String slot, String room, ReservationUpdateRequest req) {
+
+        String rsvKey = RedisKeys.rsvKey(date, slot);
+
+        Reservation current = repo.getReservation(rsvKey, room)
+                .orElseThrow(() ->
+                        new ApiException(ErrorCode.RESERVATION_NOT_FOUND) // [수정]
+                );
+
+        if (!passwordEncoder.matches(req.password(), current.passwordHash())) {
+            throw new ApiException(ErrorCode.PASSWORD_MISMATCH); // [수정]
+        }
+
+        // null 또는 공백 필드는 기존 값 유지
+        String newName =
+                (req.name() == null || req.name().isBlank()) ? current.name() : req.name();
+        String newCourse =
+                (req.course() == null || req.course().isBlank()) ? current.course() : req.course();
+        int newHeadcount =
+                (req.headcount() == null) ? current.headcount() : req.headcount();
+
+        Reservation updated =
+                new Reservation(newName, newCourse, newHeadcount, current.passwordHash());
+
+        String json = repo.toJson(updated);
+
+        Long result = redis.execute(
+                reservationUpdateScript,
+                List.of(rsvKey),
+                room,
+                json
+        );
+
+        /**Lua 결과-> errorCode 매핑**/
+        if (result == null) {
+            throw new ApiException(ErrorCode.INTERNAL_ERROR); // [수정]
+        }
+        if (result == 1L) return;
+        if (result == -1L) {
+            throw new ApiException(ErrorCode.RESERVATION_NOT_FOUND); // [수정]
+        }
+
+        throw new ApiException(ErrorCode.INTERNAL_ERROR); // [수정]
+    }
 
     private final StringRedisTemplate redis;
     private final ReservationRedisRepository repo;
@@ -59,7 +113,7 @@ public class ReservationService {
     public void create(ReservationCreateRequest req) {
 
         String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
-        String rsvKey  = RedisKeys.rsvKey(req.date(), req.slot());
+        String rsvKey = RedisKeys.rsvKey(req.date(), req.slot());
 
         // date 기준 "자정까지 남은 초" → 당일 예약 자동 만료 정책
         long ttl = RedisTtlPolicy.untilMidnight(req.date(), zoneId);
@@ -100,7 +154,7 @@ public class ReservationService {
 
     /**
      * 슬롯 전체 조회 (Read All)
-     *
+     * <p>
      * - 이름 + 비밀번호가 모두 일치하는 예약만 반환
      * - 불일치는 에러가 아니라 "조회 조건 불충족"
      */
@@ -163,57 +217,6 @@ public class ReservationService {
                         r.headcount()
                 )
         );
-    }
-
-    /**
-     * 예약 수정(Update) + 예약 삭제(Delete) 공통 흐름
-     * - 1) 현재 값 읽기, 예약 존재 여부 확인
-     * - 2) bcrypt 비번 검증
-     * - 3) 통과 시 Lua Script로 HSET Redis 변경
-     */
-    public void update(String date, String slot, String room, ReservationUpdateRequest req) {
-
-        String rsvKey = RedisKeys.rsvKey(date, slot);
-
-        Reservation current = repo.getReservation(rsvKey, room)
-                .orElseThrow(() ->
-                        new ApiException(ErrorCode.RESERVATION_NOT_FOUND) // [수정]
-                );
-
-        if (!passwordEncoder.matches(req.password(), current.passwordHash())) {
-            throw new ApiException(ErrorCode.PASSWORD_MISMATCH); // [수정]
-        }
-
-        // null 또는 공백 필드는 기존 값 유지
-        String newName =
-                (req.name() == null || req.name().isBlank()) ? current.name() : req.name();
-        String newCourse =
-                (req.course() == null || req.course().isBlank()) ? current.course() : req.course();
-        int newHeadcount =
-                (req.headcount() == null) ? current.headcount() : req.headcount();
-
-        Reservation updated =
-                new Reservation(newName, newCourse, newHeadcount, current.passwordHash());
-
-        String json = repo.toJson(updated);
-
-        Long result = redis.execute(
-                reservationUpdateScript,
-                List.of(rsvKey),
-                room,
-                json
-        );
-
-        /**Lua 결과-> errorCode 매핑**/
-        if (result == null) {
-            throw new ApiException(ErrorCode.INTERNAL_ERROR); // [수정]
-        }
-        if (result == 1L) return;
-        if (result == -1L) {
-            throw new ApiException(ErrorCode.RESERVATION_NOT_FOUND); // [수정]
-        }
-
-        throw new ApiException(ErrorCode.INTERNAL_ERROR); // [수정]
     }
 
     /**
@@ -335,4 +338,90 @@ public class ReservationService {
         }
     }
 
+
+    /**
+     * 관리자 권한 조회 로직
+     * 1. 환경변수에서 admin.name, admin.password 읽음
+     * 2. 환경변수에 있는 admin.name == 인자 name 그리고 admin.password == 인자 password 라면
+     * 3. T 반환 그 외는 F 반환 -> 컨트롤러에서 T라면 "admin" 으로 프론트(사용자)에게 반환 !
+     */
+    @Value("${admin.name:}")
+    private String adminName;
+
+    @Value("${admin.password:}")
+    private String adminPassword;
+
+    public boolean isAdmin(String name, String password) {
+        if (adminName == null || adminName.isBlank()) return false;
+        if (adminPassword == null || adminPassword.isBlank()) return false;
+        return adminName.equals(name) && adminPassword.equals(password);
+    }
+
+    /**
+     * 관리자 전체 조회 (비밀번호 없이) (특정 날짜 + 방 고정) -> 예약 현황 한번에 조회
+     * ex ) 2026-01-17,회의실 3 의 모든 날짜 조회
+     */
+    public List<ReservationResponse> adminReadRoomAllSlots(String date, String room) {
+        List<String> slots = List.of(
+                "part1", "part2", "part3", "part4", "part5", "part6", "part7", "part8"
+        );
+
+        List<ReservationResponse> out = new ArrayList<>();
+
+        for (String slot : slots) {
+            // slot 1개에 대한 전체(7개 room) 조회
+            List<ReservationResponse> allRooms = adminReadAll(date, slot);
+
+            // 그중에서 room만 골라서 있으면 추가
+            allRooms.stream()
+                    .filter(r -> room.equals(r.room()))   // ReservationResponse에 room getter/record 필드명에 맞춰 수정
+                    .findFirst()
+                    .ifPresent(out::add);
+        }
+        return out;
+    }
+
+    /**
+     * 관리자 전체 조회 (비밀번호 없이) (특정 날짜 + 특정 시간대 고정) -> 그 시간대 모든 방 조회
+     * ex ) 2026-01-17,09~10시 의 모든 예약한 방 조회
+     */
+    public List<ReservationResponse> adminReadAll(String date, String slot) {
+        String rsvKey = RedisKeys.rsvKey(date, slot);
+        Map<Object, Object> entries = repo.getAll(rsvKey);
+
+        return entries.entrySet().stream()
+                .map(e -> {
+                    Reservation r = repo.fromJson(String.valueOf(e.getValue()));
+                    return new ReservationResponse(
+                            date,
+                            slot,
+                            String.valueOf(e.getKey()), // room
+                            new ReservationResponse.ReservationData(
+                                    r.name(),
+                                    r.course(),
+                                    r.headcount()
+                            )
+                    );
+                })
+                .toList();
+    }
+
+    /**
+     * 관리자 강제 삭제(비번 없이)
+     */
+    public void adminForceDelete(String date, String slot, String room) {
+        String rsvKey = RedisKeys.rsvKey(date, slot);
+
+        Long result = redis.execute(
+                reservationDeleteScript,
+                List.of(rsvKey),
+                room
+        );
+
+        if (result == null) throw new ApiException(ErrorCode.INTERNAL_ERROR);
+        if (result == 1L) return;
+        if (result == -1L) throw new ApiException(ErrorCode.RESERVATION_NOT_FOUND);
+
+        throw new ApiException(ErrorCode.INTERNAL_ERROR);
+    }
 }
