@@ -25,6 +25,18 @@ public class ReservationRedisRepository {
         this.om = om;
     }
 
+    /**
+     * formJson(json) : json 문자열을 Reservation 객체로 역 직렬화
+     */
+    // [수정] JSON 역직렬화 책임을 Repository로 이동
+    public Reservation fromJson(String json) {
+        try {
+            return om.readValue(json, Reservation.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("예약 JSON 파싱 실패", e);
+        }
+    }
+
     public Optional<Reservation> getReservation(String rsvKey, String room) {
         String json = (String) redis.opsForHash().get(rsvKey, room);
         if (json == null) return Optional.empty();
@@ -43,12 +55,5 @@ public class ReservationRedisRepository {
         }
     }
 
-    // [수정] JSON 역직렬화 책임을 Repository로 이동
-    public Reservation fromJson(String json) {
-        try {
-            return om.readValue(json, Reservation.class);
-        } catch (Exception e) {
-            throw new IllegalStateException("예약 JSON 파싱 실패", e);
-        }
-    }
+
 }

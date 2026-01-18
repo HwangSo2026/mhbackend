@@ -28,37 +28,37 @@ public class HoldService {
         this.reservationRepo = reservationRepo;
     }
 
-//    public HoldAcquireResponse acquire(HoldAcquireRequest req) {
-//        String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
-//        String token = UUID.randomUUID().toString();
-//
-//        boolean ok = repo.acquireHold(holdKey, token, HOLD_TTL_SECONDS);
-//        if (!ok) throw new ApiException(ErrorCode.HOLD_CONFLICT); // 409
-//
-//        return new HoldAcquireResponse(token, HOLD_TTL_SECONDS);
-//    }
-public HoldAcquireResponse acquire(HoldAcquireRequest req) {
+    /**
+     * acquire : 선점하기
+     * @param  req ( date, slot, room )
+     * @return HoldAcquireResponse( holdToken, expiresInSeconds )
+     */
+    public HoldAcquireResponse acquire(HoldAcquireRequest req) {
 
-    // 1. 이미 예약 확정된 방인지 먼저 확인
-    String rsvKey = RedisKeys.rsvKey(req.date(), req.slot());
-    boolean alreadyReserved =
-            reservationRepo.getReservation(rsvKey, req.room()).isPresent();
+        // 1. 이미 예약 확정된 방인지 먼저 확인
+        String rsvKey = RedisKeys.rsvKey(req.date(), req.slot());
+        boolean alreadyReserved =
+                reservationRepo.getReservation(rsvKey, req.room()).isPresent(); //isPresent() : 있으면 T/ 없다면 F/
 
-    if (alreadyReserved) {
-        throw new ApiException(ErrorCode.RESERVATION_CONFLICT);
+        if (alreadyReserved) {
+            throw new ApiException(ErrorCode.RESERVATION_CONFLICT);
+        }
+
+        // 2. 그 다음에 hold 선점
+        String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
+        String token = UUID.randomUUID().toString();
+
+        boolean ok = repo.acquireHold(holdKey, token, HOLD_TTL_SECONDS);
+        if (!ok) throw new ApiException(ErrorCode.HOLD_CONFLICT);
+
+        return new HoldAcquireResponse(token, HOLD_TTL_SECONDS);
     }
 
-    // 2. 그 다음에 hold 선점
-    String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
-    String token = UUID.randomUUID().toString();
-
-    boolean ok = repo.acquireHold(holdKey, token, HOLD_TTL_SECONDS);
-    if (!ok) throw new ApiException(ErrorCode.HOLD_CONFLICT);
-
-    return new HoldAcquireResponse(token, HOLD_TTL_SECONDS);
-}
-
-
+    /**
+     * 토큰 상태 조회
+     * @param req
+     * @return HoldStatusResponse
+     */
     public HoldStatusResponse status(HoldStatusRequest req) {
         String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
 

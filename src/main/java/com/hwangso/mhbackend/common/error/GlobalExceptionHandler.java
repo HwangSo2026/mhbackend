@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -17,7 +18,8 @@ import java.util.List;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // (403/404/409/410 등)
+    // (400/ 01/403/404/409/410 등)
+
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> handleApiException(ApiException e, HttpServletRequest req) {
         ErrorCode ec = e.getErrorCode();
@@ -106,6 +108,16 @@ public class GlobalExceptionHandler {
                         Instant.now(),
                         null
                 ));
+    }
+
+    // 헤더 누락 Missing gRequestHeaderException
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException e, HttpServletRequest req) {
+        ErrorCode ec = ErrorCode.UNAUTHORIZED; // 또는 INVALID_REQUEST 정책에 맞게
+        return ResponseEntity.status(ec.status).body(new ErrorResponse(
+                ec.status.value(), ec.code, "필수 헤더가 누락되었습니다: " + e.getHeaderName(),
+                req.getRequestURI(), Instant.now(), null
+        ));
     }
 
     // 마지막 안전망 (500)

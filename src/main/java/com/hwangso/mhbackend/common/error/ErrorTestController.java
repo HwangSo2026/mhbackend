@@ -6,7 +6,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "3. error-test-controller", description = "전역 예외처리 테스트")
+@Tag(name = "4. error-test-controller", description = "전역 예외처리 테스트")
 @RestController
 @RequestMapping("/api/test/errors")
 public class ErrorTestController {
@@ -16,6 +16,10 @@ public class ErrorTestController {
     public ResponseEntity<String> validation(@Valid @RequestBody TestValidationRequest req) {
         return ResponseEntity.ok("OK");
     }
+
+    // ✅ 401 : ApiException UNAUTHORIZED (관리자 인증 실패시)
+    @GetMapping("/401")
+    public ResponseEntity<Void> unauthorized() { throw new ApiException(ErrorCode.UNAUTHORIZED); }
 
     // ✅ 403: ApiException
     @GetMapping("/403")

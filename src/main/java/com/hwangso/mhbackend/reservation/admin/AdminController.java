@@ -1,7 +1,10 @@
 package com.hwangso.mhbackend.reservation.admin;
 
+import com.hwangso.mhbackend.common.error.ApiException;
+import com.hwangso.mhbackend.common.error.ErrorCode;
 import com.hwangso.mhbackend.reservation.dto.ReservationResponse;
 import com.hwangso.mhbackend.reservation.service.ReservationService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.websocket.server.PathParam;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "3. Admin", description = "관리자 검증/조회/취소")
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
@@ -26,7 +30,7 @@ public class AdminController {
     @PostMapping("/login")
     public ResponseEntity<AdminLoginResponse> login(@RequestBody AdminLoginRequest req) {
         if (!reservationService.isAdmin(req.name(), req.password())) {
-            return ResponseEntity.status(401).build();
+            throw new ApiException(ErrorCode.UNAUTHORIZED);
         }
         String token = tokenService.issueToken();
         return ResponseEntity.ok(new AdminLoginResponse("admin", token));
@@ -46,7 +50,9 @@ public class AdminController {
             @RequestParam String date,
             @RequestParam String slot
     ) {
-        if (!tokenService.isValid(token)) return ResponseEntity.status(401).build();
+        if (!tokenService.isValid(token)) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED);
+        }
         return ResponseEntity.ok(reservationService.adminReadAll(date, slot));
     }
 
@@ -66,7 +72,9 @@ public class AdminController {
             @PathVariable String slot,
             @PathVariable String room
     ) {
-        if (!tokenService.isValid(token)) return ResponseEntity.status(401).build();
+        if (!tokenService.isValid(token)) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED);
+        }
         reservationService.adminForceDelete(date, slot, room);
         return ResponseEntity.ok().build();
     }
@@ -77,7 +85,9 @@ public class AdminController {
             @PathVariable String date,
             @PathVariable String room
     ) {
-        if(!tokenService.isValid(token)) return ResponseEntity.status(401).build();
+        if (!tokenService.isValid(token)) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED);
+        }
         return ResponseEntity.ok(reservationService.adminReadRoomAllSlots(date, room));
     }
 

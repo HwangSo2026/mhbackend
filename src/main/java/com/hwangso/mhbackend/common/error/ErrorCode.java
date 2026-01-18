@@ -4,6 +4,9 @@ import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
 
+    // 401 Unauthorized
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "인증에 실패했습니다."),
+
     // 403 Forbidden
     HOLD_FORBIDDEN(HttpStatus.FORBIDDEN, "HOLD_FORBIDDEN", "홀드 주인이 아닙니다."),
     PASSWORD_MISMATCH(HttpStatus.FORBIDDEN, "PASSWORD_MISMATCH", "비밀번호가 일치하지 않습니다."),

@@ -24,7 +24,7 @@ public class HoldController {
         return ResponseEntity.ok(service.acquire(req));
     }
 
-    /** 토큰 상태 조회*/
+    /** 토큰 상태 조회 (안씀)*/
     @GetMapping("/status")
     public ResponseEntity<HoldStatusResponse> status(@Valid @ModelAttribute HoldStatusRequest req) {
         return ResponseEntity.ok(service.status(req));
