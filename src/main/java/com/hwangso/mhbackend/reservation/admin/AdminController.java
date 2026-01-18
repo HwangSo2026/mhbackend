@@ -5,7 +5,6 @@ import com.hwangso.mhbackend.common.error.ErrorCode;
 import com.hwangso.mhbackend.reservation.dto.ReservationResponse;
 import com.hwangso.mhbackend.reservation.service.ReservationService;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.websocket.server.PathParam;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
