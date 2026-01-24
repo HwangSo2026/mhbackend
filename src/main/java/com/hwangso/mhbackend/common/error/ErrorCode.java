@@ -25,6 +25,9 @@ public enum ErrorCode {
     // 400 Bad Request
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "요청 값이 올바르지 않습니다."),
 
+    // 500 IllegalStateException RESERVATION_JSON_PARSE_ERROR
+    RESERVATION_JSON_PARSE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "RESERVATION_JSON_PARSE_ERROR", "예약 데이터 처리 중 오류가 발생했습니다."),
+
     // 500
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "서버 오류가 발생했습니다.");
 

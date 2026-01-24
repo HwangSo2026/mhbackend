@@ -75,7 +75,16 @@ public class ReservationController {
         service.delete(date, slot, room, req.password());
         return ResponseEntity.ok().build();
     }
-    /** 예약 시간/회의실 변경(Change) */
+
+    /**
+     *  예약 시간/회의실 변경(Change)
+     *  안쓰는 이유
+     *  Flow
+     *  1) 예약 조회
+     *  2) 예약 취소
+     *  3) 재예약 흐름으로 변경은 적용 x
+     *  -> 변경에 대한 복잡도 높아서 과정 단순화 나중에 Develop 가능
+     */
     @PostMapping("/change")
     public ResponseEntity<Void> change(
             @Valid @RequestBody ReservationChangeRequest req
@@ -83,4 +92,5 @@ public class ReservationController {
         service.change(req);
         return ResponseEntity.ok().build();
     }
+
 }

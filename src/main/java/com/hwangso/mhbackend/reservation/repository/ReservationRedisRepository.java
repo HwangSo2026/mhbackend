@@ -1,6 +1,8 @@
 package com.hwangso.mhbackend.reservation.repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hwangso.mhbackend.common.error.ApiException;
+import com.hwangso.mhbackend.common.error.ErrorCode;
 import com.hwangso.mhbackend.reservation.model.Reservation;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
@@ -28,12 +30,11 @@ public class ReservationRedisRepository {
     /**
      * formJson(json) : json 문자열을 Reservation 객체로 역 직렬화
      */
-    // [수정] JSON 역직렬화 책임을 Repository로 이동
     public Reservation fromJson(String json) {
         try {
             return om.readValue(json, Reservation.class);
         } catch (Exception e) {
-            throw new IllegalStateException("예약 JSON 파싱 실패", e);
+            throw new ApiException(ErrorCode.RESERVATION_JSON_PARSE_ERROR, e);
         }
     }
 
@@ -51,7 +52,7 @@ public class ReservationRedisRepository {
         try {
             return om.writeValueAsString(reservation);
         } catch (Exception e) {
-            throw new IllegalStateException("예약 JSON 직렬화 실패", e);
+            throw new ApiException(ErrorCode.RESERVATION_JSON_PARSE_ERROR, e);
         }
     }
 

@@ -10,9 +10,14 @@ import java.util.List;
 @Configuration
 public class OpenApiConfig {
 
+    /**
+     * openAPI Bean 배포용
+     * -> url 변경시
+     */
     @Bean
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .servers(List.of(new Server().url("https://meethub.inwoohub.com")));
     }
+
 }

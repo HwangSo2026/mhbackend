@@ -18,7 +18,6 @@ public class ReservationRedisScriptConfig {
      * - 반드시 원자적으로 실행되어야 함
      */
 
-
     @Bean(name = "reservationCreateScript")
     public RedisScript<Long> reservationCreateScript() {
         String lua = """
@@ -55,7 +54,33 @@ public class ReservationRedisScriptConfig {
     }
 
     /**
-     * 예약 수정(Update)
+     * 예약 삭제(Delete)
+     * - 비밀번호 검증은 Java에서 수행
+     * - Lua에서는 HDEL만 원자 처리
+     */
+    @Bean(name = "reservationDeleteScript")
+    public RedisScript<Long> reservationDeleteScript() {
+        String lua = """
+            -- KEYS[1] = rsvKey
+            -- ARGV[1] = room
+
+            local current = redis.call('HGET', KEYS[1], ARGV[1])
+            if not current then
+              return -1 -- NOT_FOUND
+            end
+
+            redis.call('HDEL', KEYS[1], ARGV[1])
+            return 1
+        """;
+
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptText(lua);
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    /**
+     * 예약 수정(Update) 사용 x
      * - 비밀번호 검증은 Java에서 수행
      * - Lua에서는 HSET만 원자 처리
      */
@@ -81,29 +106,4 @@ public class ReservationRedisScriptConfig {
         return script;
     }
 
-    /**
-     * 예약 삭제(Delete)
-     * - 비밀번호 검증은 Java에서 수행
-     * - Lua에서는 HDEL만 원자 처리
-     */
-    @Bean(name = "reservationDeleteScript")
-    public RedisScript<Long> reservationDeleteScript() {
-        String lua = """
-            -- KEYS[1] = rsvKey
-            -- ARGV[1] = room
-
-            local current = redis.call('HGET', KEYS[1], ARGV[1])
-            if not current then
-              return -1 -- NOT_FOUND
-            end
-
-            redis.call('HDEL', KEYS[1], ARGV[1])
-            return 1
-        """;
-
-        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
-        script.setScriptText(lua);
-        script.setResultType(Long.class);
-        return script;
-    }
 }

@@ -19,7 +19,9 @@ public class ErrorTestController {
 
     // ✅ 401 : ApiException UNAUTHORIZED (관리자 인증 실패시)
     @GetMapping("/401")
-    public ResponseEntity<Void> unauthorized() { throw new ApiException(ErrorCode.UNAUTHORIZED); }
+    public ResponseEntity<Void> unauthorized() {
+        throw new ApiException(ErrorCode.UNAUTHORIZED);
+    }
 
     // ✅ 403: ApiException
     @GetMapping("/403")
@@ -44,6 +46,10 @@ public class ErrorTestController {
     public ResponseEntity<Void> gone() {
         throw new ApiException(ErrorCode.HOLD_GONE);
     }
+
+    // ✅ 501: RESERVATION_JSON_PARSE_ERROR
+    @GetMapping("/501")
+    public ResponseEntity<Void> paresError() { throw new ApiException(ErrorCode.RESERVATION_JSON_PARSE_ERROR); }
 
     // ✅ 500: Unexpected Exception
     @GetMapping("/500")

@@ -36,11 +36,11 @@ public class ReservationService {
 
         Reservation current = repo.getReservation(rsvKey, room)
                 .orElseThrow(() ->
-                        new ApiException(ErrorCode.RESERVATION_NOT_FOUND) // [수정]
+                        new ApiException(ErrorCode.RESERVATION_NOT_FOUND)
                 );
 
         if (!passwordEncoder.matches(req.password(), current.passwordHash())) {
-            throw new ApiException(ErrorCode.PASSWORD_MISMATCH); // [수정]
+            throw new ApiException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         // null 또는 공백 필드는 기존 값 유지
@@ -65,14 +65,14 @@ public class ReservationService {
 
         /**Lua 결과-> errorCode 매핑**/
         if (result == null) {
-            throw new ApiException(ErrorCode.INTERNAL_ERROR); // [수정]
+            throw new ApiException(ErrorCode.INTERNAL_ERROR);
         }
         if (result == 1L) return;
         if (result == -1L) {
-            throw new ApiException(ErrorCode.RESERVATION_NOT_FOUND); // [수정]
+            throw new ApiException(ErrorCode.RESERVATION_NOT_FOUND);
         }
 
-        throw new ApiException(ErrorCode.INTERNAL_ERROR); // [수정]
+        throw new ApiException(ErrorCode.INTERNAL_ERROR);
     }
 
     private final StringRedisTemplate redis;
@@ -99,57 +99,6 @@ public class ReservationService {
         this.reservationCreateScript = reservationCreateScript;
         this.reservationUpdateScript = reservationUpdateScript;
         this.reservationDeleteScript = reservationDeleteScript;
-    }
-
-    /**
-     * 예약 확정(Create)
-     * 흐름:
-     * 1. RedisKeys를 이용해 holdKey / rsvKey 생성
-     * 2. date 기준 자정까지 남은 시간 계산 → TTL
-     * 3. password bcrypt 해시
-     * 4. Lua Script 실행 (원자 처리)
-     * 5. Lua 반환값 → ErrorCode로 매핑
-     */
-    public void create(ReservationCreateRequest req) {
-
-        String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
-        String rsvKey = RedisKeys.rsvKey(req.date(), req.slot());
-
-        // date 기준 "자정까지 남은 초" → 당일 예약 자동 만료 정책
-        long ttl = RedisTtlPolicy.untilMidnight(req.date(), zoneId);
-
-        String passwordHash = passwordEncoder.encode(req.password());
-        Reservation reservation =
-                new Reservation(req.name(), req.course(), req.headcount(), passwordHash);
-
-        String reservationJson = repo.toJson(reservation);
-
-        Long result = redis.execute(
-                reservationCreateScript,
-                List.of(holdKey, rsvKey),
-                req.holdToken(),
-                req.room(),
-                reservationJson,
-                String.valueOf(ttl)
-        );
-
-        if (result == null) {
-            throw new ApiException(ErrorCode.INTERNAL_ERROR);   // [수정]
-        }
-
-        if (result == 1L) return;
-
-        if (result == -1L) {
-            throw new ApiException(ErrorCode.HOLD_NOT_FOUND);   // [수정]
-        }
-        if (result == 0L) {
-            throw new ApiException(ErrorCode.HOLD_FORBIDDEN);   // [수정]
-        }
-        if (result == -2L) {
-            throw new ApiException(ErrorCode.RESERVATION_CONFLICT); // [수정]
-        }
-
-        throw new ApiException(ErrorCode.INTERNAL_ERROR);       // [수정]
     }
 
     /**
@@ -194,6 +143,57 @@ public class ReservationService {
     }
 
     /**
+     * 예약 확정(Create)
+     * 흐름:
+     * 1. RedisKeys를 이용해 holdKey / rsvKey 생성
+     * 2. date 기준 자정까지 남은 시간 계산 → TTL
+     * 3. password bcrypt 해시
+     * 4. Lua Script 실행 (원자 처리)
+     * 5. Lua 반환값 → ErrorCode로 매핑
+     */
+    public void create(ReservationCreateRequest req) {
+
+        String holdKey = RedisKeys.holdKey(req.date(), req.slot(), req.room());
+        String rsvKey = RedisKeys.rsvKey(req.date(), req.slot());
+
+        // date 기준 "자정까지 남은 초" → 당일 예약 자동 만료 정책
+        long ttl = RedisTtlPolicy.untilMidnight(req.date(), zoneId);
+
+        String passwordHash = passwordEncoder.encode(req.password());
+        Reservation reservation =
+                new Reservation(req.name(), req.course(), req.headcount(), passwordHash);
+
+        String reservationJson = repo.toJson(reservation);
+
+        Long result = redis.execute(
+                reservationCreateScript,
+                List.of(holdKey, rsvKey),
+                req.holdToken(),
+                req.room(),
+                reservationJson,
+                String.valueOf(ttl)
+        );
+
+        if (result == null) {
+            throw new ApiException(ErrorCode.INTERNAL_ERROR);
+        }
+
+        if (result == 1L) return;
+
+        if (result == -1L) {
+            throw new ApiException(ErrorCode.HOLD_NOT_FOUND);
+        }
+        if (result == 0L) {
+            throw new ApiException(ErrorCode.HOLD_FORBIDDEN);
+        }
+        if (result == -2L) {
+            throw new ApiException(ErrorCode.RESERVATION_CONFLICT);
+        }
+
+        throw new ApiException(ErrorCode.INTERNAL_ERROR);
+    }
+
+    /**
      * 단건 조회(Read One)
      * url date/slot/room을 알고 있어야,,
      * 이미 예약 구조를 알고 있는 사람(관리자)
@@ -204,7 +204,7 @@ public class ReservationService {
 
         Reservation r = repo.getReservation(rsvKey, room)
                 .orElseThrow(() ->
-                        new ApiException(ErrorCode.RESERVATION_NOT_FOUND) // [수정]
+                        new ApiException(ErrorCode.RESERVATION_NOT_FOUND)
                 );
 
         return new ReservationResponse(
@@ -228,7 +228,7 @@ public class ReservationService {
 
         Reservation current = repo.getReservation(rsvKey, room)
                 .orElseThrow(() ->
-                        new ApiException(ErrorCode.RESERVATION_NOT_FOUND) // [수정]
+                        new ApiException(ErrorCode.RESERVATION_NOT_FOUND)
                 );
 
         log.info("DELETE password raw = {}", password);
@@ -239,7 +239,7 @@ public class ReservationService {
         );
 
         if (!passwordEncoder.matches(password, current.passwordHash())) {
-            throw new ApiException(ErrorCode.PASSWORD_MISMATCH); // [수정]
+            throw new ApiException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         Long result = redis.execute(
@@ -249,14 +249,14 @@ public class ReservationService {
         );
 
         if (result == null) {
-            throw new ApiException(ErrorCode.INTERNAL_ERROR); // [수정]
+            throw new ApiException(ErrorCode.INTERNAL_ERROR);
         }
         if (result == 1L) return;
         if (result == -1L) {
-            throw new ApiException(ErrorCode.RESERVATION_NOT_FOUND); // [수정]
+            throw new ApiException(ErrorCode.RESERVATION_NOT_FOUND);
         }
 
-        throw new ApiException(ErrorCode.INTERNAL_ERROR); // [수정]
+        throw new ApiException(ErrorCode.INTERNAL_ERROR);
     }
 
     /**

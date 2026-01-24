@@ -89,7 +89,6 @@ public class HoldService {
         // 슬롯 하나에 대해 회의실 1~7번 상태를 담을 리스트
         var rooms = new java.util.ArrayList<RoomHoldStatus>(7);
 
-        // [추가됨]
         // 예약 확정 정보는 "slot 단위 Hash"에 저장되어 있으므로
         // 미리 rsvKey를 한 번만 만들어 둔다
         // (기존 코드는 holdKey만 사용했음)
@@ -102,26 +101,15 @@ public class HoldService {
             // 선점(hold) 상태는 room 단위 Key
             String holdKey = RedisKeys.holdKey(req.date(), req.slot(), room);
 
-            // 기존 코드:
-            // boolean held = repo.existsHold(holdKey);
-            //
-            // -> 문제:
-            // 이미 "예약 확정"된 방은 holdKey가 없기 때문에
-            // 예약 가능으로 잘못 판단됨
-
-            // [기존과 동일]
             // 현재 다른 사용자가 선점 중인지 확인
             boolean holdExists = repo.existsHold(holdKey);
 
-            // [추가됨 - 핵심 변경]
             // 이미 예약이 "확정"되어 Redis Hash에 들어있는지 확인
             // → CRUD 추가 후 반드시 필요해진 검사
             boolean reservationExists =
                     reservationRepo.getReservation(rsvKey, room).isPresent();
 
-            // [변경된 판단 기준]
-            // 예전: holdExists 하나만 봤음
-            // 지금: "선점 중 OR 이미 예약됨" 이면 사용 불가
+            // "선점 중 OR 이미 예약됨" 이면 사용 불가
             boolean blocked = holdExists || reservationExists;
 
             // 예약도 안 됐고, 선점도 안 된 경우
